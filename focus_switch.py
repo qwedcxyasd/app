@@ -3,12 +3,12 @@ import google.generativeai as genai
 import random
 
 # --- 1. KI KONFIGURATION ---
-# Wir holen den Key direkt aus den Secrets
 try:
     genai.configure(api_key=st.secrets["gemini_key"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Wir stellen sicher, dass wir das Modell korrekt ansprechen
+    model = genai.GenerativeModel('models/gemini-1.5-flash') 
 except Exception as e:
-    st.error("Fehler: API Key nicht gefunden. Bitte prüfe die Secrets in Streamlit.")
+    st.error(f"Konfigurationsfehler: {str(e)}")
 
 # --- 2. LOGIK FUNKTION ---
 def get_ai_response(topic):
@@ -19,11 +19,18 @@ def get_ai_response(topic):
     STRUKTUR: Ein kurzer Fakt, gefolgt von einer Transferfrage.
     """
     try:
+        # Falls v1beta nötig ist, wird das hier oft automatisch geregelt, 
+        # aber wir nutzen den sichersten Aufruf:
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"KI konnte nicht geladen werden: {str(e)}"
-
+        # Falls es immer noch ein Modell-Fehler ist, versuchen wir das 1.0 Pro Modell als Backup
+        try:
+            backup_model = genai.GenerativeModel('gemini-pro')
+            response = backup_model.generate_content(prompt)
+            return response.text
+        except:
+            return f"Technischer Fehler: {str(e)}. Bitte prüfe, ob dein API-Key im Google AI Studio Zugriff auf 'Gemini 1.5 Flash' hat."
 # --- 3. UI & CSS ---
 st.set_page_config(page_title="FocusSwitch", page_icon="🛑")
 
@@ -71,3 +78,4 @@ if st.session_state.get('show_result'):
             <b>Fortschritt:</b> Du hast heute {st.session_state.total_stops} Mal den Fokus zurückgeholt.
         </div>
     """, unsafe_allow_html=True)
+
