@@ -1,27 +1,24 @@
 import streamlit as st
+import google.generativeai as genai
 import random
-import datetime
 import os
-import base64
 
-# --- KONFIGURATION ---
-st.set_page_config(page_title="FocusSwitch Pro", page_icon="🛑", layout="centered")
+# --- 1. KI KONFIGURATION ---
+try:
+    genai.configure(api_key=st.secrets["gemini_key"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except Exception as e:
+    st.error("API Key fehlt oder ist ungültig. Bitte in den Streamlit Secrets hinterlegen.")
 
-# --- HILFSFUNKTIONEN ---
+# --- 2. HILFSFUNKTIONEN ---
 def get_stats():
-    if not os.path.exists("stats.txt"):
-        return 0
-    with open("stats.txt", "r") as f:
-        return int(f.read())
-
-def increment_stats():
-    count = get_stats() + 1
-    with open("stats.txt", "w") as f:
-        f.write(str(count))
-    return count
+    # Wir nutzen st.session_state für die Session-Statistik
+    if 'total_stops' not in st.session_state:
+        st.session_state.total_stops = 0
+    return st.session_state.total_stops
 
 def play_sound():
-    # Ein kurzer, sauberer "Blip" Sound
+    # Kurzer akustischer Reiz zur Unterbrechung
     sound_html = """
         <audio autoplay>
             <source src="https://www.soundjay.com/buttons/sounds/button-16.mp3" type="audio/mpeg">
@@ -29,61 +26,93 @@ def play_sound():
     """
     st.markdown(sound_html, unsafe_allow_html=True)
 
-# --- CSS (STOPPSCHILD & STYLING) ---
+def get_ai_response(topic):
+    prompt = f"""
+    KONTEXT: Der User steckt in einer Grübelschleife (Trennungsschmerz). 
+    AUFGABE: Unterbrich das Grübeln sofort mit einem faszinierenden, komplexen Fakt über {topic}.
+    STIL: Wissenschaftlich, stoisch, intellektuell fordernd. Keine Esoterik, kein Mitleid.
+    STRUKTUR: 
+    1. Ein kurzer, krasser Fakt.
+    2. Eine Transferaufgabe oder Logik-Frage, die aktives Denken erfordert.
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "Fokus-Wechsel fehlgeschlagen. Zähle stattdessen die Primzahlen von 1 bis 20 rückwärts!"
+
+# --- 3. UI & DESIGN ---
+st.set_page_config(page_title="FocusSwitch", page_icon="🛑")
+
 st.markdown("""
     <style>
+    /* Das Stoppschild-Design */
     .stButton>button {
-        background-color: #CC0000; color: white; font-size: 50px;
-        font-weight: bold; height: 220px; width: 220px;
-        border-radius: 20%; border: 5px solid white;
-        display: block; margin: auto; box-shadow: 0px 10px 20px rgba(0,0,0,0.3);
+        background-color: #CC0000;
+        color: white;
+        font-size: 40px;
+        font-weight: bold;
+        height: 220px;
+        width: 220px;
+        border-radius: 20%; /* Achteck-Annäherung */
+        border: 6px solid white;
+        display: block;
+        margin: auto;
+        box-shadow: 0px 10px 25px rgba(0,0,0,0.4);
+        transition: all 0.2s;
     }
-    .stats-box {
-        text-align: center; padding: 10px; background: #e1e4e8;
-        border-radius: 10px; margin-top: 20px; font-weight: bold;
+    .stButton>button:hover {
+        background-color: #FF0000;
+        transform: scale(1.02);
+        border-color: #eeeeee;
+    }
+    .stats-container {
+        text-align: center;
+        background-color: #f0f2f6;
+        padding: 15px;
+        border-radius: 15px;
+        margin-top: 30px;
+        border: 1px solid #d1d5db;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- APP LOGIK ---
-st.title("🛑 FocusSwitch Pro")
-st.write("Dein Werkzeug gegen Grübelschleifen.")
+# --- 4. HAUPTSEITE ---
+st.title("🛑 FocusSwitch")
+st.write("Drücke den Button, sobald das Grübeln beginnt.")
+
+# Interessen-Pool für die KI
+INTERESTS = ["Quantenmechanik", "Stoische Philosophie", "Römische Strategie", "Neurobiologie", "Astrophysik", "Spieltheorie"]
 
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
     if st.button("STOPP"):
         play_sound()
-        count = increment_stats()
-        st.session_state.triggered = True
-        st.session_state.count = count
-        
-        # KI-Interessen
-        interests = ["Quantenphysik", "Stoische Philosophie", "Technik der Zukunft", "Römische Geschichte"]
-        st.session_state.topic = random.choice(interests)
-        
-        # Hier die Platzhalter-Logik (oder dein API-Call)
-        st.session_state.content = f"Interessanter Fakt über {st.session_state.topic}: [Hier generiert die KI einen tiefen Einblick...]"
+        st.session_state.total_stops += 1
+        st.session_state.active_topic = random.choice(INTERESTS)
+        with st.spinner('Extrahiere Fokus-Thema...'):
+            st.session_state.active_content = get_ai_response(st.session_state.active_topic)
+        st.session_state.show_result = True
 
-# Ergebnisanzeige
-if st.session_state.get('triggered'):
-    st.markdown(f"### 🧠 Fokus-Wechsel: {st.session_state.topic}")
-    st.info(st.session_state.content)
+# --- 5. ERGEBNIS-ANZEIGE ---
+if st.session_state.get('show_result'):
+    st.divider()
+    st.markdown(f"### 🧠 Neuer Fokus: {st.session_state.active_topic}")
+    st.info(st.session_state.active_content)
     
+    # Statistik Anzeige
     st.markdown(f"""
-        <div class='stats-box'>
-            ✅ Du hast heute bereits {st.session_state.count} Mal aktiv deinen Fokus zurückgeholt!
+        <div class="stats-container">
+            <b>Fortschritt heute:</b><br>
+            Du hast bereits {get_stats()} Mal erfolgreich die Reißleine gezogen.
         </div>
     """, unsafe_allow_html=True)
     
-    st.text_area("Analysiere diesen Fakt kurz:", placeholder="Tippe hier, um dein Gehirn zu fordern...")
+    # Kognitiver Anker (Input-Feld)
+    st.text_area("Deine logische Schlussfolgerung (tippen aktiviert den Verstand):", 
+                 key="logic_input",
+                 placeholder="Schreibe hier kurz deinen Gedanken zum Thema auf...")
 
-# --- ANLEITUNG ZUM DEPLOYMENT (PUNKT 3) ---
-with st.expander("🚀 So bringst du die App auf dein Handy (Kostenlos)"):
-    st.write("""
-    1. Erstelle einen kostenlosen Account bei [GitHub](https://github.com).
-    2. Lade diese Datei (`focus_switch.py`) dort in ein neues 'Repository' hoch.
-    3. Gehe zu [streamlit.io/cloud](https://streamlit.io/cloud) und verbinde deinen GitHub-Account.
-    4. Wähle dein Repository aus – Streamlit gibt dir eine URL (z.B. `deine-app.streamlit.app`).
-    5. Öffne die URL am Handy im Browser und wähle im Menü 'Zum Startbildschirm hinzufügen'.
-    """)
+st.write("---")
+st.caption("Fokus auf das, was kontrollierbar ist. – Nach Epiktet.")
