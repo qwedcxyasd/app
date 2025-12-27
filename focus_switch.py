@@ -71,5 +71,29 @@ if st.session_state.fact:
     # 1. Erzähle mir mehr
     if not st.session_state.extra_content:
         if st.button("💬 Erzähle mir mehr", use_container_width=True):
-            st.session_state.extra_content = get_mistral_content(st.session_state.current_topic, "detail", context
-                                                                
+            st.session_state.extra_content = get_mistral_content(st.session_state.current_topic, "detail", context=st.session_state.fact)
+            st.session_state.extra_type = "detail"
+            st.rerun()
+
+    # Anzeige der Erweiterung (Details oder Aufgabe)
+    if st.session_state.extra_content:
+        if st.session_state.extra_type == "detail":
+            st.success(f"**Vertiefung:**\n\n{st.session_state.extra_content}")
+        else:
+            st.warning(f"**Denkaufgabe:**\n\n{st.session_state.extra_content}")
+
+    # Vertikale Navigation mit korrekter Groß-/Kleinschreibung
+    st.write("")
+    
+    # 2. Anderes Thema
+    if st.button("⏭️ Anderes Thema", use_container_width=True):
+        st.session_state.fact = get_mistral_content(st.session_state.current_topic, "fact")
+        st.session_state.extra_content = ""
+        st.session_state.extra_type = ""
+        st.rerun()
+    
+    # 3. Denkaufgabe
+    if st.button("🧩 Denkaufgabe", use_container_width=True):
+        st.session_state.extra_content = get_abstract_task()
+        st.session_state.extra_type = "task"
+        st.rerun()
