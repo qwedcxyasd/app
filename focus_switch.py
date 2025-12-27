@@ -5,8 +5,8 @@ import random
 # --- 1. KI KONFIGURATION ---
 try:
     genai.configure(api_key=st.secrets["gemini_key"])
-    # Wir stellen sicher, dass wir das Modell korrekt ansprechen
-    model = genai.GenerativeModel('models/gemini-1.5-flash') 
+    # Wir versuchen das stabilste Modell-Naming
+    model = genai.GenerativeModel('gemini-1.5-flash') 
 except Exception as e:
     st.error(f"Konfigurationsfehler: {str(e)}")
 
@@ -15,22 +15,22 @@ def get_ai_response(topic):
     prompt = f"""
     KONTEXT: Der User steckt in einer Grübelschleife. 
     AUFGABE: Unterbrich das Grübeln sofort mit einem faszinierenden Fakt über {topic}.
-    STIL: Wissenschaftlich, fordernd. Keine Esoterik.
-    STRUKTUR: Ein kurzer Fakt, gefolgt von einer Transferfrage.
+    STIL: Wissenschaftlich, stoisch, fordernd. Keine Esoterik.
+    STRUKTUR: Ein kurzer Fakt, gefolgt von einer schwierigen Transferfrage.
     """
     try:
-        # Falls v1beta nötig ist, wird das hier oft automatisch geregelt, 
-        # aber wir nutzen den sichersten Aufruf:
+        # Hier rufen wir die Generierung auf
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        # Falls es immer noch ein Modell-Fehler ist, versuchen wir das 1.0 Pro Modell als Backup
+        # Falls 'gemini-1.5-flash' nicht will, versuchen wir das bewährte 'gemini-pro'
         try:
             backup_model = genai.GenerativeModel('gemini-pro')
             response = backup_model.generate_content(prompt)
             return response.text
-        except:
-            return f"Technischer Fehler: {str(e)}. Bitte prüfe, ob dein API-Key im Google AI Studio Zugriff auf 'Gemini 1.5 Flash' hat."
+        except Exception as e2:
+            return f"Fehler: {str(e2)}. Bitte prüfe, ob die Bibliothek 'google-generativeai' in der requirements.txt steht."
+            
 # --- 3. UI & CSS ---
 st.set_page_config(page_title="FocusSwitch", page_icon="🛑")
 
@@ -78,4 +78,5 @@ if st.session_state.get('show_result'):
             <b>Fortschritt:</b> Du hast heute {st.session_state.total_stops} Mal den Fokus zurückgeholt.
         </div>
     """, unsafe_allow_html=True)
+
 
