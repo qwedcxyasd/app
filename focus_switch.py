@@ -84,35 +84,44 @@ st.write("Drücke den Button, sobald das Grübeln beginnt.")
 # Interessen-Pool für die KI
 INTERESTS = ["Quantenmechanik", "Stoische Philosophie", "Römische Strategie", "Neurobiologie", "Astrophysik", "Spieltheorie"]
 
+# Initialisiere Session State Variablen, falls sie noch nicht existieren
+if 'total_stops' not in st.session_state:
+    st.session_state.total_stops = 0
+if 'show_result' not in st.session_state:
+    st.session_state.show_result = False
+
 col1, col2, col3 = st.columns([1, 2, 1])
 
 with col2:
     if st.button("STOPP"):
         play_sound()
         st.session_state.total_stops += 1
-        st.session_state.active_topic = random.choice(INTERESTS)
+        topic = random.choice(INTERESTS)
+        st.session_state.active_topic = topic
+        
         with st.spinner('Extrahiere Fokus-Thema...'):
-            st.session_state.active_content = get_ai_response(st.session_state.active_topic)
+            # HIER wird jetzt die echte KI aufgerufen:
+            st.session_state.active_content = get_ai_response(topic)
+        
         st.session_state.show_result = True
 
 # --- 5. ERGEBNIS-ANZEIGE ---
-if st.session_state.get('show_result'):
+if st.session_state.show_result:
     st.divider()
     st.markdown(f"### 🧠 Neuer Fokus: {st.session_state.active_topic}")
+    
+    # Hier wird der echte Inhalt von Gemini angezeigt
     st.info(st.session_state.active_content)
     
     # Statistik Anzeige
     st.markdown(f"""
         <div class="stats-container">
             <b>Fortschritt heute:</b><br>
-            Du hast bereits {get_stats()} Mal erfolgreich die Reißleine gezogen.
+            Du hast bereits {st.session_state.total_stops} Mal erfolgreich die Reißleine gezogen.
         </div>
     """, unsafe_allow_html=True)
     
     # Kognitiver Anker (Input-Feld)
     st.text_area("Deine logische Schlussfolgerung (tippen aktiviert den Verstand):", 
-                 key="logic_input",
+                 key="logic_input_field",
                  placeholder="Schreibe hier kurz deinen Gedanken zum Thema auf...")
-
-st.write("---")
-st.caption("Fokus auf das, was kontrollierbar ist. – Nach Epiktet.")
