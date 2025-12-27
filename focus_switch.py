@@ -2,33 +2,23 @@ import streamlit as st
 import google.generativeai as genai
 import random
 
-# --- 1. KI KONFIGURATION MIT AUTO-SCAN ---
+# --- 1. KI KONFIGURATION ---
 def get_working_model():
     try:
         genai.configure(api_key=st.secrets["gemini_key"])
-        
-        # Wir listen alle verfügbaren Modelle auf, die Content generieren können
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Wir suchen nach einem Flash oder Pro Modell
-        for model_name in ["models/gemini-1.5-flash", "models/gemini-1.5-flash-latest", "models/gemini-pro"]:
-            if model_name in available_models:
-                return genai.GenerativeModel(model_name)
-        
-        # Falls keines der obigen in der Liste ist, nimm das erste verfügbare
-        if available_models:
-            return genai.GenerativeModel(available_models[0])
+        return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        st.error(f"Kritischer Fehler beim Modell-Scan: {e}")
-    return None
+        st.error(f"Fehler: {e}")
+        return None
 
 model = get_working_model()
 
 # --- 2. LOGIK FUNKTION ---
-def get_ai_response(topic):
-    prompt = f"Gib mir einen extrem interessanten wissenschaftlichen Fakt über {topic}. Stelle danach eine schwierige Transferfrage. Stil: Sachlich, keine Empathie."
-    if model is None:
-        return "Modell konnte nicht initialisiert werden. Prüfe deine API-Berechtigungen."
+def get_ai_response(topic, mode):
+    if mode == "Info":
+        prompt = f"Gib mir einen extrem faszinierenden wissenschaftlichen oder historischen Fakt über das Thema '{topic}'. Stil: Sachlich, kurz, fordernd."
+    else:
+        prompt = f"Gib mir eine schwierige logische Denkaufgabe oder eine Transferfrage zum Thema '{topic}', um jemanden aus einer Grübelschleife zu reißen. Der User muss aktiv nachdenken müssen."
     
     try:
         response = model.generate_content(prompt)
@@ -36,30 +26,60 @@ def get_ai_response(topic):
     except Exception as e:
         return f"Fehler bei der Generierung: {str(e)}"
 
-# --- 3. UI & CSS ---
-st.set_page_config(page_title="FocusSwitch", page_icon="🛑")
-st.markdown("<style>.stButton>button {background-color: #CC0000; color: white; font-size: 40px; font-weight: bold; height: 220px; width: 220px; border-radius: 20%; border: 6px solid white; display: block; margin: auto; box-shadow: 0px 10px 25px rgba(0,0,0,0.4);}</style>", unsafe_allow_html=True)
+# --- 3. UI & DESIGN ---
+st.set_page_config(page_title="FocusSwitch Pro", page_icon="🛑")
+
+st.markdown("""
+    <style>
+    .stButton>button {
+        background-color: #CC0000; color: white; font-size: 30px;
+        font-weight: bold; height: 150px; width: 100%;
+        border-radius: 15px; border: 4px solid white;
+        box-shadow: 0px 8px 15px rgba(0,0,0,0.3);
+    }
+    .main-box {
+        background-color: #f8f9fa; padding: 20px; border-radius: 15px;
+        border: 1px solid #dee2e6; margin-bottom: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 4. APP ABLAUF ---
-st.title("🛑 FocusSwitch")
+st.title("🛑 FocusSwitch Pro")
 
-if 'total_stops' not in st.session_state:
-    st.session_state.total_stops = 0
+# Eingabebereich
+with st.container():
+    st.markdown("<div class='main-box'>", unsafe_allow_html=True)
+    user_topic = st.text_input("Wunsch-Thema (leer lassen für Zufall):", placeholder="z.B. Zeitreisen, Biologie, Rom...")
+    
+    mode = st.radio(
+        "Was brauchst du gerade?",
+        ["Interessante Info", "Knifflige Denkaufgabe"],
+        horizontal=True
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
-INTERESTS = ["Quantenmechanik", "Stoische Philosophie", "Neurobiologie", "Astrophysik", "Spieltheorie"]
+# Zufallsthemen falls Feld leer
+RANDOM_TOPICS = ["Quantenphysik", "Stoische Philosophie", "Neurobiologie", "Astrophysik", "Spieltheorie", "Architektur"]
 
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    if st.button("STOPP"):
-        st.session_state.total_stops += 1
-        topic = random.choice(INTERESTS)
-        st.session_state.active_topic = topic
-        with st.spinner('Modelle werden gescannt und Fokus gewechselt...'):
-            st.session_state.active_content = get_ai_response(topic)
+if st.button("FOKUS WECHSELN"):
+    # Thema festlegen
+    final_topic = user_topic if user_topic else random.choice(RANDOM_TOPICS)
+    selected_mode = "Info" if mode == "Interessante Info" else "Task"
+    
+    with st.spinner(f'Generiere {mode} zu {final_topic}...'):
+        content = get_ai_response(final_topic, selected_mode)
+        st.session_state.active_content = content
+        st.session_state.active_topic = final_topic
         st.session_state.show_result = True
 
+# Ergebnisanzeige
 if st.session_state.get('show_result'):
     st.divider()
-    st.markdown(f"### 🧠 Thema: {st.session_state.active_topic}")
+    st.subheader(f"🧠 {st.session_state.active_topic}")
     st.info(st.session_state.active_content)
-    st.write(f"**Erfolgreiche Stopps heute:** {st.session_state.total_stops}")
+    
+    if "Denkaufgabe" in mode:
+        st.success("Tipp: Versuche die Lösung im Kopf zu formulieren, bevor du weitergehst.")
+
+st.caption("Nutze dieses Tool als Notfall-Bremse für deine Gedanken.")
